@@ -1,0 +1,53 @@
+- name: Launching AWS instance using Ansible
+  hosts: localhost
+  connection: local
+  gather_facts: no
+
+  vars:
+    aws_access_key: \\*Your aws access key*\\
+    aws_secret_key: \\*Your aws secret key*\\
+
+  tasks:
+
+    - name: Create AWS instances
+      ec2:
+        key_name: \\*Your aws key name*\\
+        group: \\*Your aws security group*\\
+        instance_type: \\*Your aws instance type*\\
+        image: ami-\\*Your aws ami image id*\\
+        region: \\*Your aws region*\\
+        wait: yes
+        count: 1
+        instance_tags:
+          name: \\*Your aws tags name*\\
+        vpc_subnet_id: \\*Your aws vpc subnet id*\\
+        assign_public_ip: yes
+        aws_access_key: "{{ aws_access_key }}"
+        aws_secret_key: "{{ aws_secret_key }}"
+      register: ec2
+
+    - name: Save hosts data within a group
+      add_host:
+        hostname: "{{ item.public_ip }}"
+        groupname: ec2_instances_temp
+      with_items: "{{ ec2.instances }}"
+
+    - name: Wait for SSH to come up
+      wait_for: host={{ item.public_ip }} port=22 delay=10 timeout=60
+      with_items: "{{ ec2.instances }}"
+
+    - name: setting fact
+      set_fact: host={{ item.public_ip }}
+      with_items: "{{ ec2.instances }}"
+
+- name: Configure instance post-creation
+  hosts: ec2_instances_temp
+  gather_facts: True
+  remote_user: \\*Your aws instance user*\\
+
+  tasks:
+
+    - name: Copy test file
+      ansible.builtin.copy:
+        src: my-aws-file
+        dest: /tmp/my-aws-file
